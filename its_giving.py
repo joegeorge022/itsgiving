@@ -8,7 +8,7 @@ virtual camera. See README.md.
 
   python its_giving.py [--camera 1] [--no-vcam] [--size 640x480] [--no-flip]
 
-Keys:  q quit   d toggle HUD   1-9 0 - = [ ] force-show a pose
+Keys:  q quit   d toggle HUD   1-9 0 - = [ ] \\ ; ' / . , g s force-show a pose
 """
 import argparse
 import os
@@ -25,14 +25,17 @@ from mediapipe.tasks import python as mp_tasks
 from mediapipe.tasks.python import vision
 
 POSES = ["time_out", "heart", "cover_nose", "crashing_out", "dance", "nose_closed", "flirty", "hand_up",
-         "tongue_out", "open_mouth", "disgusted", "talking_to_wall", "suspicious", "spin"]
-TEST_KEYS = "1234567890-=[]"
+         "tongue_out", "open_mouth", "disgusted", "talking_to_wall", "suspicious", "spin",
+         "think_about_it", "monkey_thinking", "try_not_to_laugh", "hmm", "hmph", "kiss", "goal", "sunglasses"]
+TEST_KEYS = "1234567890-=[]\\;'/. ,gs"
 
 FACE_SCALE = 2.0
 HOLD_FRAMES = 10
 ARM = {
     "spin": 15, "suspicious": 8, "talking_to_wall": 6, "dance": 6, "crashing_out": 4,
     "open_mouth": 4, "tongue_out": 5, "disgusted": 5,
+    "think_about_it": 4, "monkey_thinking": 4, "try_not_to_laugh": 4, "hmm": 2, "hmph": 3, "kiss": 3,
+    "goal": 3, "sunglasses": 2,
 }
 T = dict(
     jaw_open=0.5,
@@ -156,9 +159,11 @@ def find_asset_file(pose):
     if not os.path.isdir(adir):
         return None
     exts = (".gif", ".png", ".jpg", ".jpeg")
+    norm_pose = pose.replace("-", "_")
     for fn in sorted(os.listdir(adir)):
         stem, ext = os.path.splitext(fn)
-        if ext.lower() in exts and (stem == pose or stem.endswith("_" + pose)):
+        norm_stem = stem.replace("-", "_")
+        if ext.lower() in exts and (norm_stem == norm_pose or norm_stem.endswith("_" + norm_pose)):
             return os.path.join(adir, fn)
     return None
 
@@ -217,6 +222,8 @@ class Face:
         self.mouth = (p[13] + p[14]) / 2
         self.eye_y = float((p[33][1] + p[263][1]) / 2)
         cl, cr = p[234], p[454]
+        self.temple_l, self.temple_r = p[127], p[356]
+        self.mouth_l, self.mouth_r = p[61], p[291]
         self.turn = abs((self.nose[0] - cl[0]) / max(cr[0] - cl[0], 1e-3) - 0.5)
         self.bs = {c.category_name: c.score for c in (blendshapes or [])}
 
@@ -234,6 +241,8 @@ class Hand:
         self.vertical = abs(d[1]) > 1.5 * abs(d[0])
         ext = [dist(p[0], p[t]) > 1.2 * dist(p[0], p[t - 2]) for t in (8, 12, 16, 20)]
         self.open = sum(ext) >= 3
+        z_pointing = lms[8].z < lms[5].z - 0.03
+        self.pointing = bool((ext[0] or z_pointing) and not self.open and not (ext[2] and ext[3]))
 
 
 class Body:
@@ -326,6 +335,15 @@ def decide(face, hands, body, tongue, gesture):
             return "heart", d
         if near(a.palm, face.mouth, 0.6) and near(b.palm, face.mouth, 0.6):
             return "cover_nose", d
+        left_right = ((a.index[0] - face.nose[0]) * (b.index[0] - face.nose[0]) < 0 or
+                      (a.palm[0] - face.nose[0]) * (b.palm[0] - face.nose[0]) < 0)
+        at_eye_level = ((abs(a.index[1] - face.eye_y) < 0.55 * fw or abs(a.palm[1] - face.eye_y) < 0.60 * fw) and
+                        (abs(b.index[1] - face.eye_y) < 0.55 * fw or abs(b.palm[1] - face.eye_y) < 0.60 * fw))
+        pinching = ((near(a.thumb, a.index, 0.40) or not a.open) and
+                    (near(b.thumb, b.index, 0.40) or not b.open))
+        near_face = dist(a.index, face.nose) < 1.4 * fw and dist(b.index, face.nose) < 1.4 * fw
+        if left_right and at_eye_level and pinching and near_face and jaw < 0.35:
+            return "sunglasses", d
         on_head = lambda h: (h.palm[1] < face.eye_y and abs(h.palm[0] - face.nose[0]) < 1.1 * fw
                              and h.palm[1] > face.top[1] - 0.8 * face.h)
         if on_head(a) and on_head(b) and jaw > T["scream_jaw"]:
@@ -336,6 +354,12 @@ def decide(face, hands, body, tongue, gesture):
         return ("crashing_out" if jaw > T["scream_jaw"] else "dance"), d
 
     for h in hands:
+        puckered = max(face.b("mouthPucker"), face.b("mouthFunnel")) >= 0.18
+        hand_at_mouth = (near(h.index, face.mouth, 0.40) or near(h.middle, face.mouth, 0.40) or
+                         near(h.thumb, face.mouth, 0.40) or near(h.palm, face.mouth, 0.45))
+        if puckered and hand_at_mouth:
+            return "kiss", d
+
         if near(h.thumb, face.nose, 0.35) and near(h.index, face.nose, 0.35) and near(h.thumb, h.index, 0.3):
             return "nose_closed", d
         if near(h.index, face.mouth, 0.22) and not near(h.palm, face.mouth, 0.3):
@@ -343,10 +367,46 @@ def decide(face, hands, body, tongue, gesture):
         if h.open and h.palm[1] < face.nose[1] and abs(h.palm[0] - face.nose[0]) > 0.8 * fw:
             return "hand_up", d
 
+        at_temple = (near(h.index, face.temple_l, 0.45) or near(h.index, face.temple_r, 0.45) or
+                     near(h.middle, face.temple_l, 0.45) or near(h.middle, face.temple_r, 0.45))
+        if len(hands) == 1 and at_temple and not h.open:
+            return "think_about_it", d
+
+        at_mouth_corner = (near(h.index, face.mouth_l, 0.35) or near(h.index, face.mouth_r, 0.35)) and not near(h.index, face.mouth, 0.18)
+        not_cradling = not near(h.palm, face.chin, 0.40)
+        if at_mouth_corner and not h.open and not_cradling:
+            return "monkey_thinking", d
+
+        cradling_chin = (near(h.palm, face.chin, 0.55) or near(h.thumb, face.chin, 0.50) or near(h.index, face.chin, 0.45))
+        mouth_neutral = jaw < 0.25 and pair("mouthSmile") < 0.28
+        not_temple = not (near(h.index, face.temple_l, 0.45) or near(h.index, face.temple_r, 0.45))
+        if cradling_chin and mouth_neutral and not_temple:
+            return "hmm", d
+
+        smiling = pair("mouthSmile") >= 0.18
+        at_chest = h.palm[1] > face.nose[1] and not near(h.palm, face.mouth, 0.45)
+        if h.pointing and smiling and at_chest:
+            return "goal", d
+
     if tongue > T["tongue"]:
         return "tongue_out", d
-    if jaw > T["jaw_open"]:
+
+    smile = pair("mouthSmile")
+    cheek = pair("cheekSquint")
+    press = pair("mouthPress")
+    chin = face.b("mouthShrugLower")
+    dimple = pair("mouthDimple")
+    eye_wide = pair("eyeWide")
+    serene_smile = (smile >= 0.22 and (cheek >= 0.10 or dimple >= 0.15) and jaw < 0.25 and squint < 0.50)
+    suppression = ((press >= 0.15 or chin >= 0.18) and (eye_wide >= 0.05 or dimple >= 0.15 or smile >= 0.15) and jaw < 0.18)
+    if (serene_smile or suppression) and not any(near(h.palm, face.mouth, 0.5) for h in hands):
+        return "try_not_to_laugh", d
+
+    if (jaw > T["jaw_open"] or jaw >= 0.38) and not any(near(h.palm, face.mouth, 0.5) for h in hands):
         return "open_mouth", d
+    if jaw >= 0.18 and not any(near(h.palm, face.mouth, 0.5) for h in hands):
+        return "hmph", d
+
     if sneer > T["sneer"] or disgust > T["disgust"]:
         return "disgusted", d
     if hands and gesture > T["gesture"]:
@@ -369,7 +429,7 @@ def draw_hud(img, shown, raw, d, face, hands, body):
         f"showing: {shown or '-'}   raw: {raw or '-'}   hands: {d.get('hands', 0)}   elbows up: {'Y' if d.get('elbows_up') else 'n'}",
         f"jaw {d.get('jaw', 0):.2f}  tongue {d.get('tongue', 0):.2f}  turn {d.get('turn', 0):.2f}  squint {d.get('squint', 0):.2f}  gesture {d.get('gesture', 0):.3f}",
         f"disgust {d.get('disgust', 0):.2f} = 2x sneer {d.get('sneer', 0):.2f} + brow {d.get('brow', 0):.2f} + frown {d.get('frown', 0):.2f} + lip {d.get('lip', 0):.2f}",
-        "keys: q quit  d hud  1-9 0 - = [ ] test poses",
+        "keys: q quit  d hud  1-9 0 - = [ ] \\ ; ' / . , g s test poses",
     ]
     for i, t in enumerate(lines):
         y = 24 + 22 * i
@@ -492,14 +552,16 @@ def main():
             if show_hud:
                 preview = frame.copy()
                 draw_hud(preview, shown, raw, dbg, face, hands, body)
-            cv2.imshow("Reaction Cam  (q quit, d HUD, 1-9 0 - = [ ] test)", preview)
+            cv2.imshow("Reaction Cam  (q quit, d HUD, 1-9 0 - = [ ] \\ ; ' / . , g s test)", preview)
             key = cv2.waitKey(1) & 0xFF
             if key == ord("q"):
                 break
             if key == ord("d"):
                 show_hud = not show_hud
             elif 0 < key < 256 and chr(key) in TEST_KEYS:
-                forced, forced_until = POSES[TEST_KEYS.index(chr(key))], now + 2.0
+                idx = TEST_KEYS.index(chr(key))
+                if idx < len(POSES):
+                    forced, forced_until = POSES[idx], now + 2.0
     finally:
         cap.release()
         face_det.close()

@@ -18,9 +18,9 @@ python its_giving.py              # preview + virtual camera
 python its_giving.py --no-vcam    # preview only
 ```
 
-Fourteen reactions: time out, heart hands, hands over face, crashing out,
+Twenty-two reactions: time out, heart hands, hands over face, crashing out,
 dancing, nose pinch, flirty, hand up, tongue out, gasp, disgust, talking to the
-wall, side-eye, and spinning.
+wall, side-eye, spinning, think about it, monkey thinking, trying not to laugh, hmm (pondering), hmph (extreme shock / gasp), kiss (Messi finger kiss), goal (Messi point & smile celebration), and sunglasses (Diddy lowering sunglasses with both hands).
 
 There's a second file, `its_giving_v2.py`, which is the same thing with the
 expression thresholds calibrated to *your* face instead of to a number I
@@ -60,7 +60,7 @@ python its_giving_v2.py
 | `q` | quit |
 | `d` | toggle the HUD |
 | `c` | recalibrate |
-| `1`–`9` `0` `-` `=` `[` `]` | force a reaction on screen for 2 seconds |
+| `1`–`9` `0` `-` `=` `[` `]` `\` `;` `'` `/` `.` `,` `g` `s` | force a reaction on screen for 2 seconds |
 
 ---
 
@@ -108,11 +108,19 @@ someone who likes you first.
 | `flirty` | one index fingertip on your lips |
 | `hand_up` | one open palm up beside your head |
 | `tongue_out` | tongue out, mouth open |
-| `open_mouth` | jaw drops |
+| `open_mouth` | full shocked reaction: drop jaw wide open |
 | `disgusted` | scrunch your nose, or brows down and frown |
 | `talking_to_wall` | hands in frame, gesturing away |
 | `suspicious` | turn your head and squint |
 | `spin` | leave the frame entirely |
+| `think_about_it` | tap or point finger(s) at your temple / side of head |
+| `monkey_thinking` | Barbary macaque thinking: press index finger against the corner of your mouth |
+| `try_not_to_laugh` | IShowSpeed forced smile / holding in laughter with wide staring eyes |
+| `hmm` | IShowSpeed "Hmm": cradle chin/jawline with hand under chin, lips pressed flat, stare into camera |
+| `hmph` | casual open mouth: slightly parted / relaxed open mouth (less excited than full shock) |
+| `kiss` | Lionel Messi kiss: pucker / pout lips and bring fingertips to mouth (blowing a kiss) |
+| `goal` | Lionel Messi goal celebration: smile and point index finger at the camera at chest level |
+| `sunglasses` | Diddy lowering sunglasses: bring both hands up pinching at eye level (one on each side) |
 
 Assets live in `assets/`, named after the pose — `heart.jpeg`, `spin.gif`.
 Swap in your own by dropping a file with the right name; JPEG, PNG and animated
@@ -254,3 +262,11 @@ checks.
 
 Want to change **what sets off what**? `decide()`.
 Want to change **how easily it goes off**? `Z`, `FLOOR` and `ARM`.
+
+
+Run on my device:
+```bash
+cd itsgiving
+source venv/bin/activate
+python its_giving_v2.py --camera 1 --size 1280x720
+```
