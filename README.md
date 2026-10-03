@@ -7,6 +7,15 @@
   </tr>
 </table>
 
+> **What's new in this fork:**
+> We expanded the meme reaction roster to **22 unique reactions** with fine-tuned gesture and facial expression detection:
+> - **Messi Celebrations**: Post-goal finger kiss (`kiss.gif`) and celebratory smile & point (`goal.gif`).
+> - **Lowering Sunglasses**: Double-handed pinch gesture at eye level (`sunglasses.gif`).
+> - **Think About It**: Single-finger temple tap gesture (`think-about-it.gif`).
+> - **Thinking & Pondering**: Monkey thinking with finger to lips (`monkey-thinking.jpeg`) vs. palm under chin contemplation (`hmm.gif`).
+> - **Shock & Laughter**: Casual shock gasp (`hmph.gif`) vs. shocked jaw drop (`open_mouth`), plus holding back laughter (`try-not-to-laugh.gif`).
+> - Full 22-pose keyboard test controls mapped across both `its_giving.py` and `its_giving_v2.py`.
+
 Pull a face at your webcam. It works out *which* face, and drops the matching
 meme over your head, scaled to follow you around the frame. You can extend and
 add more memes to your heart's desire.
